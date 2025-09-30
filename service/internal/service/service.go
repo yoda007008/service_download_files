@@ -2,8 +2,12 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
+	"io"
+	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"testtask/service/internal/dto"
 	"time"
@@ -79,8 +83,66 @@ func (t *TaskManager) Worker() {
 		case task := <-t.queue:
 			t.RunTask(task)
 		case <-t.stopCh:
-
 			return
 		}
 	}
+}
+
+func (t *TaskManager) RunTask(task *dto.Task) {
+	t.mu.Lock()
+	task.Status = dto.StatusRunning
+	t.mu.Unlock()
+
+	taskDir := filepath.Join("downloads", task.ID)
+	os.MkdirAll(taskDir, 0755)
+
+	for i, url := range task.URLs {
+		t.mu.Lock()
+		if task.Status == dto.StatusFailed { // отменена
+			t.mu.Unlock()
+			return
+		}
+		t.mu.Unlock()
+
+		if err := t.DownloadFile(taskDir, url); err != nil {
+			t.mu.Lock()
+			task.Status = dto.StatusFailed
+			task.Error = err.Error()
+			t.mu.Unlock()
+			t.Save()
+			return
+		}
+
+		t.mu.Lock()
+		task.Completed = i + 1
+		t.mu.Unlock()
+		t.Save()
+	}
+
+	t.mu.Lock()
+	task.Status = dto.StatusDone
+	t.mu.Unlock()
+	t.Save()
+}
+
+func (m *TaskManager) DownloadFile(dir, url string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("bad status: %s", resp.Status)
+	}
+
+	filename := filepath.Join(dir, filepath.Base(url))
+	out, err := os.Create(filename)
+	if err != nil {
+		return err // todo обработка ошибки
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	return err // todo обработка ошибки
 }
