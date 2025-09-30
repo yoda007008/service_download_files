@@ -59,3 +59,22 @@ func (t *TaskManager) Save() error {
 
 	return json.NewEncoder(f).Encode(t.tasks)
 }
+
+func (t *TaskManager) Run() {
+	for i := 0; i < t.workers; i++ {
+		t.waitGroup.Add(1)
+		go t.Worker()
+	}
+}
+
+func (t *TaskManager) Worker() {
+	defer t.waitGroup.Done()
+	for {
+		select {
+		case task := <-t.queue:
+			//t.RunTask(task) todo RunTask
+		case <-t.stopCh:
+			return
+		}
+	}
+}
