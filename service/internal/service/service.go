@@ -67,13 +67,19 @@ func (t *TaskManager) Run() {
 	}
 }
 
+func (t *TaskManager) Stop() {
+	close(t.stopCh)
+	t.waitGroup.Wait()
+}
+
 func (t *TaskManager) Worker() {
 	defer t.waitGroup.Done()
 	for {
 		select {
 		case task := <-t.queue:
-			//t.RunTask(task) todo RunTask
+			t.RunTask(task)
 		case <-t.stopCh:
+
 			return
 		}
 	}
