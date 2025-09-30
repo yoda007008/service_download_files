@@ -125,7 +125,7 @@ func (t *TaskManager) RunTask(task *dto.Task) {
 	t.Save()
 }
 
-func (m *TaskManager) DownloadFile(dir, url string) error {
+func (t *TaskManager) DownloadFile(dir, url string) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -145,4 +145,30 @@ func (m *TaskManager) DownloadFile(dir, url string) error {
 
 	_, err = io.Copy(out, resp.Body)
 	return err // todo обработка ошибки
+}
+
+func (t *TaskManager) Load() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	f, err := os.Open(t.filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // todo обработка ошибки
+		}
+		return err
+	}
+	defer f.Close()
+
+	if err := json.NewDecoder(f).Decode(&t.tasks); err != nil {
+		return err // todo обработка ошибки
+	}
+
+	for _, m := range t.tasks {
+		if m.Status == dto.StatusPending || m.Status == dto.StatusRunning {
+			m.Status = dto.StatusPending
+			t.queue <- m
+		}
+	}
+	return nil
 }
