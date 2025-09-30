@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 type TaskStatus string
 
 // todo maybe new status
@@ -11,7 +13,13 @@ const (
 )
 
 type Task struct {
-	ID     string     `json:"id"`
-	URLs   []string   `json:"urls"`
-	Status TaskStatus `json:"status"`
+	ID        string     `json:"id"`
+	URLs      []string   `json:"urls"`
+	Status    TaskStatus `json:"status"`
+	Total     int        `json:"total"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+type TaskImpl interface { // todo dependency for interface for testing
+
 }
